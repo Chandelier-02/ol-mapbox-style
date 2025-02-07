@@ -344,7 +344,6 @@ export function stylefunction(
   olLayer,
   glStyle,
   sourceOrLayers,
-  propertiesDisc,
   resolutions = defaultResolutions,
   spriteData = undefined,
   spriteImageUrl = undefined,
@@ -463,6 +462,8 @@ export function stylefunction(
 
   const stylesCache = new Map();
 
+  const streetPropertyDisc = 'TYPEROAD';
+
   /**
    * @param {import("ol/Feature").default|import("ol/render/Feature").default} feature Feature.
    * @param {number} resolution Resolution.
@@ -489,7 +490,7 @@ export function stylefunction(
     // let stylesLength = -1;
     let featureBelongsToLayer;
 
-    const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`);
+    const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[streetPropertyDisc]}`);
     if (cachedStyles && cachedStyles.length > 0) {
       return cachedStyles;
     }
@@ -1397,6 +1398,7 @@ export function stylefunction(
                   functionCache,
                   featureState,
                 );
+          /** @type {CanvasTextAlign} */
           let textAlign;
           if (placement === 'line-center') {
             text.setPlacement('line');
@@ -1485,6 +1487,7 @@ export function stylefunction(
             text.setRotateWithView(false);
           }
           text.setTextAlign(textAlign);
+          /** @type {CanvasTextBaseline} */
           let textBaseline = 'middle';
           if (textAnchor.indexOf('bottom') == 0) {
             textBaseline = 'bottom';
@@ -1572,16 +1575,16 @@ export function stylefunction(
       }
 
       if (newStyles.length > 0) {
-        const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`);
+        const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[streetPropertyDisc]}`);
         if (cachedStyles) {
           cachedStyles.push(...newStyles);
         } else {
-          stylesCache.set(`${Math.round(zoom)}:${properties[propertiesDisc]}`, newStyles);
+          stylesCache.set(`${Math.round(zoom)}:${properties[streetPropertyDisc]}`, newStyles);
         }
       }
     }
 
-    const newCachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`)
+    const newCachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[streetPropertyDisc]}`)
     if (newCachedStyles && newCachedStyles.length > 0) {
       if (recordLayer) {
         if ('set' in feature) {
