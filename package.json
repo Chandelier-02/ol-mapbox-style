@@ -4,13 +4,11 @@
   "description": "Create OpenLayers maps from Mapbox Style objects",
   "type": "module",
   "browser": "dist/index.js",
-  "main": "dist/olms.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./src/index.js",
-      "require": "./dist/olms.js",
       "types": "./dist/index.d.ts"
     }
   },
@@ -32,7 +30,7 @@
   "scripts": {
     "start": "webpack serve --config ./webpack.config.examples.cjs",
     "prepare": "npm run doc && npm run build",
-    "build": "tsc --project tsconfig-build.json && rollup -c && webpack-cli --mode=production --config ./webpack.config.examples.cjs",
+    "build": "tsc --project tsconfig-build.json ",
     "doc": "typedoc --plugin typedoc-plugin-missing-exports src/index.js --excludeExternals --tsconfig tsconfig-typecheck.json --out ./_site",
     "karma": "karma start test/karma.conf.cjs",
     "lint": "eslint test examples src",

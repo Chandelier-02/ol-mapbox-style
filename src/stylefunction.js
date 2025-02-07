@@ -138,7 +138,9 @@ export function getValue(
     }
   }
   zoomObj.zoom = zoom;
-  return functions[property](zoomObj, feature, featureState);
+
+  const value = functions[property](zoomObj, feature, featureState);
+  return value;
 }
 
 /**
@@ -316,6 +318,7 @@ export const styleFunctionArgs = {};
  * from the Mapbox/MapLibre Style object. When a `source` key is provided, all layers for
  * the specified source will be included in the style function. When layer `id`s
  * are provided, they must be from layers that use the same source.
+ * @param {string} propertiesDisc Singular property on the feature that is used for cache keys.
  * @param {Array<number>} resolutions
  * Resolutions for mapping resolution to zoom level.
  * @param {Object} spriteData Sprite data from the url specified in
@@ -341,6 +344,7 @@ export function stylefunction(
   olLayer,
   glStyle,
   sourceOrLayers,
+  propertiesDisc,
   resolutions = defaultResolutions,
   spriteData = undefined,
   spriteImageUrl = undefined,
@@ -457,7 +461,7 @@ export function stylefunction(
   const textHalo = new Stroke();
   const textColor = new Fill();
 
-  const styles = [];
+  const stylesCache = new Map();
 
   /**
    * @param {import("ol/Feature").default|import("ol/render/Feature").default} feature Feature.
@@ -466,7 +470,7 @@ export function stylefunction(
    * @return {Array<import("ol/style/Style").default>} Style.
    */
   const styleFunction = function (feature, resolution, onlyLayer) {
-    const properties = feature.getProperties();
+    const properties = feature.getPropertiesInternal();
     const layers = layersBySourceLayer[properties.layer];
     if (!layers) {
       return undefined;
@@ -482,8 +486,14 @@ export function stylefunction(
       type: type,
     };
     const featureState = olLayer.get('mapbox-featurestate')[feature.getId()];
-    let stylesLength = -1;
+    // let stylesLength = -1;
     let featureBelongsToLayer;
+
+    const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`);
+    if (cachedStyles && cachedStyles.length > 0) {
+      return cachedStyles;
+    }
+
     for (let i = 0, ii = layers.length; i < ii; ++i) {
       const layerData = layers[i];
       const layer = layerData.layer;
@@ -491,6 +501,8 @@ export function stylefunction(
       if (onlyLayer !== undefined && onlyLayer !== layerId) {
         continue;
       }
+
+      const newStyles = [];
 
       const layout = layer.layout || emptyObj;
       const paint = layer.paint || emptyObj;
@@ -535,19 +547,11 @@ export function stylefunction(
                   ? fromTemplate(fillIcon, properties)
                   : fillIcon.toString();
               if (spriteImage && spriteData && spriteData[icon]) {
-                ++stylesLength;
-                style = styles[stylesLength];
-                if (
-                  !style ||
-                  !style.getFill() ||
-                  style.getStroke() ||
-                  style.getText()
-                ) {
-                  style = new Style({
-                    fill: new Fill(),
-                  });
-                  styles[stylesLength] = style;
-                }
+                style = new Style({
+                  fill: new Fill(),
+                });
+                newStyles.push(style);
+
                 fill = style.getFill();
                 style.setZIndex(index);
                 const icon_cache_key = icon + '.' + opacity;
@@ -610,22 +614,12 @@ export function stylefunction(
               strokeColor = color;
             }
             if (color || strokeColor) {
-              ++stylesLength;
-              style = styles[stylesLength];
-              if (
-                !style ||
-                (color && !style.getFill()) ||
-                (!color && style.getFill()) ||
-                (strokeColor && !style.getStroke()) ||
-                (!strokeColor && style.getStroke()) ||
-                style.getText()
-              ) {
-                style = new Style({
-                  fill: color ? new Fill() : undefined,
-                  stroke: strokeColor ? new Stroke() : undefined,
-                });
-                styles[stylesLength] = style;
-              }
+              style = new Style({
+                fill: color ? new Fill() : undefined,
+                stroke: strokeColor ? new Stroke() : undefined,
+              });
+              newStyles.push(style);
+
               if (color) {
                 fill = style.getFill();
                 fill.setColor(color);
@@ -674,19 +668,11 @@ export function stylefunction(
             featureState,
           );
           if (color && width > 0) {
-            ++stylesLength;
-            style = styles[stylesLength];
-            if (
-              !style ||
-              !style.getStroke() ||
-              style.getFill() ||
-              style.getText()
-            ) {
-              style = new Style({
-                stroke: new Stroke(),
-              });
-              styles[stylesLength] = style;
-            }
+            style = new Style({
+              stroke: new Stroke(),
+            });
+            newStyles.push(style);
+
             stroke = style.getStroke();
             stroke.setLineCap(
               getValue(
@@ -1013,17 +999,9 @@ export function stylefunction(
                   }
                 }
                 if (iconImg) {
-                  ++stylesLength;
-                  style = styles[stylesLength];
-                  if (
-                    !style ||
-                    !style.getImage() ||
-                    style.getFill() ||
-                    style.getStroke()
-                  ) {
-                    style = new Style();
-                    styles[stylesLength] = style;
-                  }
+                  style = new Style();
+                  newStyles.push(style);
+
                   style.setGeometry(styleGeom);
                   iconImg.setRotation(
                     placementAngle +
@@ -1078,17 +1056,9 @@ export function stylefunction(
         }
 
         if (type == 1 && layer.type === 'circle') {
-          ++stylesLength;
-          style = styles[stylesLength];
-          if (
-            !style ||
-            !style.getImage() ||
-            style.getFill() ||
-            style.getStroke()
-          ) {
-            style = new Style();
-            styles[stylesLength] = style;
-          }
+          style = new Style();
+          newStyles.push(style);
+
           const circleRadius =
             'circle-radius' in paint
               ? getValue(
@@ -1327,17 +1297,9 @@ export function stylefunction(
         }
         if (label && opacity && !skipLabel) {
           if (!hasImage) {
-            ++stylesLength;
-            style = styles[stylesLength];
-            if (
-              !style ||
-              !style.getText() ||
-              style.getFill() ||
-              style.getStroke()
-            ) {
-              style = new Style();
-              styles[stylesLength] = style;
-            }
+            style = new Style();
+            newStyles.push(style);
+
             style.setImage(undefined);
             style.setGeometry(undefined);
           }
@@ -1608,10 +1570,19 @@ export function stylefunction(
           style.setZIndex(index);
         }
       }
+
+      if (newStyles.length > 0) {
+        const cachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`);
+        if (cachedStyles) {
+          cachedStyles.push(...newStyles);
+        } else {
+          stylesCache.set(`${Math.round(zoom)}:${properties[propertiesDisc]}`, newStyles);
+        }
+      }
     }
 
-    if (stylesLength > -1) {
-      styles.length = stylesLength + 1;
+    const newCachedStyles = stylesCache.get(`${Math.floor(zoom)}:${properties[propertiesDisc]}`)
+    if (newCachedStyles && newCachedStyles.length > 0) {
       if (recordLayer) {
         if ('set' in feature) {
           // ol/Feature
@@ -1621,7 +1592,7 @@ export function stylefunction(
           feature.getProperties()['mapbox-layer'] = featureBelongsToLayer;
         }
       }
-      return styles;
+      return newCachedStyles;
     }
     return undefined;
   };
